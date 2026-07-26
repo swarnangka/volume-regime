@@ -137,6 +137,18 @@ button.on{background:var(--mark); border-color:var(--mark); color:#0d1119}
   background:#3a2a12; border:1px solid var(--amber); color:var(--amber);
   padding:8px 12px; border-radius:2px; font-size:12px; margin-bottom:14px;
 }
+.snapshot{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px}
+.chip{
+  background:var(--panel); border:1px solid var(--rule); border-left:3px solid var(--rule);
+  border-radius:3px; padding:8px 14px; min-width:132px; flex:1 1 132px;
+}
+.chip .k{font-size:9px; letter-spacing:.09em; text-transform:uppercase; color:var(--faint)}
+.chip .v{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.chip .v small{font-size:11px; font-weight:400; color:var(--dim); margin-left:2px}
+.chip.up{border-left-color:var(--demand)} .chip.up .v{color:var(--demand)}
+.chip.dn{border-left-color:var(--risk)} .chip.dn .v{color:var(--risk)}
+.chip.am{border-left-color:var(--amber)} .chip.am .v{color:var(--amber)}
+.chip.mk{border-left-color:var(--mark)} .chip.mk .v{color:var(--mark)}
 .hidden{display:none}
 @media (max-width:860px){
   .topgrid,.botgrid,.names{grid-template-columns:1fr}
@@ -155,6 +167,8 @@ button.on{background:var(--mark); border-color:var(--mark); color:#0d1119}
     <span id="m-gen">—</span>
   </div>
 </div>
+
+<div class="snapshot" id="snapshot"></div>
 
 <div id="stalebar" class="warnbar hidden"></div>
 
@@ -444,6 +458,8 @@ function render(){
     }
   }
 
+  renderSnapshot(cur,pl);
+
   document.getElementById("ratio").textContent=cur.ratio.toFixed(2)+(cur.ratio_capped?"+":"");
   document.getElementById("regime").textContent=cur._band;
   document.getElementById("action").textContent=cur._action;
@@ -547,6 +563,25 @@ function renderTape(sessions,bands){
   svg.setAttribute("width",W); svg.setAttribute("height",H); svg.innerHTML=s;
   document.getElementById("tapesub").textContent=
     `${view.length} sessions · amber = the 3-day slope window`;
+}
+
+function renderSnapshot(cur,pl){
+  const sl=cur.slope_label;
+  const slCls = sl==="RISING"?"up" : sl==="FALLING"?"dn" : sl.startsWith("DRIFT")?"am":"mk";
+  const mature = cur.ratio>=1 && cur.days_in_regime>=MATURITY_WARN;
+  const chips=[
+    ["Ratio", cur.ratio>=1?"up":"dn", `${cur.ratio.toFixed(2)}`],
+    ["Regime", "mk", cur._band],
+    ["Slope (3d)", slCls, sl],
+    ["Days in regime", mature?"am":"mk", `${cur.days_in_regime}<small>${cur.days_in_regime===1?'day':'days'}</small>`],
+    ["Breadth", cur.adv>cur.dec?"up":"dn", `${cur.adv}<small>up</small> / ${cur.dec}<small>dn</small>`],
+    ["High-vol", "up", `${cur.n_high}<small>/ ${cur.n_counted}</small>`],
+    ["Low-vol", "dn", `${cur.n_low}<small>/ ${cur.n_counted}</small>`],
+    ["Baseline", "mk", `${pl.meta.params.lookback}d<small>${pl.meta.params.baseline}</small>`],
+  ];
+  document.getElementById("snapshot").innerHTML = chips.map(c=>
+    `<div class="chip ${c[1]}"><div class="k">${c[0]}</div><div class="v">${c[2]}</div></div>`
+  ).join("");
 }
 
 function renderReadout(cur,pl){
