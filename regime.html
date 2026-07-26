@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Volume Regime</title>
+<style>
+:root{
+  --ink:#10141c; --panel:#161d28; --panel2:#1c2431; --rule:#2a3444;
+  --text:#e4e8ef; --dim:#8794a8; --faint:#5a6678;
+  --demand:#3fa787; --risk:#d45b6a; --amber:#e4a94f; --mark:#7c9ce8;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ink); color:var(--text); font-family:var(--sans);
+  font-size:14px; line-height:1.45; padding:20px; max-width:1240px; margin:0 auto;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; font-weight:400}
+.eyebrow{
+  font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--faint); font-family:var(--sans);
+}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+/* ---------- masthead ---------- */
+.masthead{
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:16px; flex-wrap:wrap; padding-bottom:12px;
+  border-bottom:1px solid var(--rule); margin-bottom:18px;
+}
+.masthead h1{font-family:var(--serif); font-size:26px; letter-spacing:-.01em}
+.masthead h1 em{font-style:italic; color:var(--dim)}
+.mast-meta{display:flex; gap:18px; align-items:baseline; flex-wrap:wrap}
+.mast-meta span{font-size:11px; color:var(--dim); font-family:var(--mono)}
+
+/* ---------- top row ---------- */
+.topgrid{display:grid; grid-template-columns:1fr 1.05fr; gap:16px; margin-bottom:16px}
+.card{background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:16px}
+
+.readnow{display:flex; flex-direction:column; gap:2px}
+.bignum{
+  font-family:var(--mono); font-size:66px; line-height:1;
+  letter-spacing:-.03em; margin:6px 0 2px;
+}
+.regimename{font-family:var(--serif); font-size:27px; letter-spacing:.01em}
+.regimeaction{color:var(--dim); font-size:13px; margin-top:2px}
+.pctline{font-size:11px; color:var(--faint); margin-top:10px; font-family:var(--mono)}
+
+.verdict{
+  margin-top:14px; padding:11px 13px; border-radius:2px;
+  border-left:3px solid var(--rule); background:var(--panel2);
+}
+.verdict .sig{font-size:11px; letter-spacing:.06em; color:var(--dim); text-transform:uppercase}
+.verdict .vd{font-family:var(--serif); font-size:17px; margin-top:3px}
+.t-good{border-left-color:var(--demand)} .t-good .vd{color:var(--demand)}
+.t-danger{border-left-color:var(--risk)} .t-danger .vd{color:var(--risk)}
+.t-warn{border-left-color:var(--amber)} .t-warn .vd{color:var(--amber)}
+.t-neutral{border-left-color:var(--mark)} .t-neutral .vd{color:var(--mark)}
+
+/* ---------- ladder ---------- */
+.ladder{display:flex; flex-direction:column; gap:3px; margin-top:12px}
+.rung{
+  display:grid; grid-template-columns:78px 1fr 74px; align-items:center;
+  gap:10px; padding:5px 8px; border-radius:2px; background:var(--panel2);
+  position:relative; transition:background .15s;
+}
+.rung.here{background:#243044; box-shadow:inset 0 0 0 1px var(--mark)}
+.rung-label{font-size:11px; letter-spacing:.04em; font-family:var(--sans)}
+.rung.here .rung-label{color:var(--mark)}
+.rung-bar{height:12px; background:#0d1119; border-radius:1px; overflow:hidden; position:relative}
+.rung-fill{height:100%; background:var(--faint)}
+.rung.here .rung-fill{background:var(--mark)}
+.rung-ref{position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--amber); opacity:.85}
+.rung-val{font-size:11px; color:var(--dim); text-align:right; font-family:var(--mono)}
+.legend{font-size:10px; color:var(--faint); margin-top:9px; display:flex; gap:14px; flex-wrap:wrap}
+.swatch{display:inline-block; width:9px; height:9px; vertical-align:-1px; margin-right:4px}
+
+/* ---------- tape ---------- */
+.tape-head{display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px}
+.tape-wrap{margin-top:10px; overflow-x:auto}
+svg{display:block}
+.gridline{stroke:var(--rule); stroke-width:1}
+.zonelabel{font-family:var(--sans); font-size:9px; fill:var(--faint); letter-spacing:.08em}
+.steppath{fill:none; stroke:var(--text); stroke-width:1.6; stroke-linejoin:miter}
+.slopeseg{fill:none; stroke:var(--amber); stroke-width:3; stroke-linejoin:miter}
+.axistext{font-family:var(--mono); font-size:9px; fill:var(--faint)}
+
+/* ---------- readout ---------- */
+.botgrid{display:grid; grid-template-columns:1fr 1.25fr; gap:16px; margin-top:16px}
+table{border-collapse:collapse; width:100%}
+.readout td{padding:7px 4px; border-bottom:1px solid var(--rule); font-size:13px}
+.readout tr:last-child td{border-bottom:none}
+.readout td:first-child{color:var(--dim); font-size:11px; letter-spacing:.05em; text-transform:uppercase; width:44%}
+.readout td:last-child{text-align:right; font-family:var(--mono)}
+.up{color:var(--demand)} .dn{color:var(--risk)} .neu{color:var(--dim)} .am{color:var(--amber)}
+
+.names{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.names h3{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:6px}
+.nametbl td{padding:3px 2px; font-size:11px; font-family:var(--mono); border-bottom:1px solid #202836}
+.nametbl td:nth-child(2),.nametbl td:nth-child(3),.nametbl td:nth-child(4){text-align:right}
+.nametbl th{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+  font-family:var(--sans);font-weight:400;text-align:right;padding:0 2px 4px}
+.nametbl th:first-child{text-align:left}
+.scrollbox{max-height:250px; overflow-y:auto}
+
+/* ---------- controls ---------- */
+.controls{
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+  margin-top:16px; padding:13px 16px; background:var(--panel);
+  border:1px solid var(--rule); border-radius:3px;
+}
+label{font-size:11px; color:var(--dim); display:flex; align-items:center; gap:6px}
+input[type=number]{
+  width:62px; background:var(--ink); color:var(--text); border:1px solid var(--rule);
+  border-radius:2px; padding:4px 6px; font-family:var(--mono); font-size:12px;
+}
+button{
+  background:var(--panel2); color:var(--text); border:1px solid var(--rule);
+  border-radius:2px; padding:6px 12px; font-size:12px; cursor:pointer; font-family:var(--sans);
+}
+button:hover{background:#26303f}
+button.on{background:var(--mark); border-color:var(--mark); color:#0d1119}
+:focus-visible{outline:2px solid var(--mark); outline-offset:2px}
+
+.drop{
+  margin-top:14px; padding:20px; border:1px dashed var(--rule); border-radius:3px;
+  text-align:center; color:var(--faint); font-size:12px;
+}
+.drop.over{border-color:var(--mark); color:var(--mark); background:var(--panel)}
+.note{font-size:11px; color:var(--faint); margin-top:14px; line-height:1.6}
+.warnbar{
+  background:#3a2a12; border:1px solid var(--amber); color:var(--amber);
+  padding:8px 12px; border-radius:2px; font-size:12px; margin-bottom:14px;
+}
+.hidden{display:none}
+@media (max-width:860px){
+  .topgrid,.botgrid,.names{grid-template-columns:1fr}
+  .bignum{font-size:52px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>Volume Regime <em>— which environment am I in?</em></h1>
+  <div class="mast-meta">
+    <span id="m-date">—</span>
+    <span id="m-universe">—</span>
+    <span id="m-gen">—</span>
+  </div>
+</div>
+
+<div id="stalebar" class="warnbar hidden"></div>
+
+<div id="demobar" class="warnbar hidden">
+  Showing demo data — synthetic, not real prices. Run
+  <span class="num">python fetch_regime.py</span> to load the live market.
+</div>
+
+<div class="topgrid">
+  <div class="card readnow">
+    <div class="eyebrow">High-volume stocks ÷ low-volume stocks</div>
+    <div class="bignum num" id="ratio">—</div>
+    <div class="regimename" id="regime">—</div>
+    <div class="regimeaction" id="action">—</div>
+    <div class="pctline" id="pct">—</div>
+    <div class="verdict t-neutral" id="verdictbox">
+      <div class="sig" id="signal">—</div>
+      <div class="vd" id="verdict">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">Where this reading sits</div>
+    <div class="ladder" id="ladder"></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--faint)"></span>your sample</span>
+      <span><span class="swatch" style="background:var(--amber)"></span>22-year reference</span>
+      <span><span class="swatch" style="background:var(--mark)"></span>today</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="tape-head">
+    <div>
+      <div class="eyebrow">The tape — read it as stair-steps, not a line</div>
+      <div style="font-size:12px;color:var(--dim);margin-top:3px" id="tapesub">—</div>
+    </div>
+    <div>
+      <button id="btn-90" class="on">90 sessions</button>
+      <button id="btn-180">180</button>
+      <button id="btn-all">All</button>
+    </div>
+  </div>
+  <div class="tape-wrap"><svg id="tape" width="1180" height="260"></svg></div>
+</div>
+
+<div class="botgrid">
+  <div class="card">
+    <div class="eyebrow">Today's readout</div>
+    <table class="readout"><tbody id="readout"></tbody></table>
+  </div>
+  <div class="card">
+    <div class="eyebrow">What's driving it</div>
+    <div class="names" style="margin-top:10px">
+      <div>
+        <h3 title="close = where in the day's range the stock closed, 0-100">High volume — ≥<span id="hm">1.5</span>× baseline</h3>
+        <div class="scrollbox"><table class="nametbl"><thead><tr><th>stock</th><th>rvol</th><th>chg</th><th>close</th></tr></thead><tbody id="hinames"></tbody></table></div>
+      </div>
+      <div>
+        <h3 title="close = where in the day's range the stock closed, 0-100">Dried up — &lt;<span id="lm">0.5</span>× baseline</h3>
+        <div class="scrollbox"><table class="nametbl"><thead><tr><th>stock</th><th>rvol</th><th>chg</th><th>close</th></tr></thead><tbody id="lonames"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <strong style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)">Bands</strong>
+  <button id="btn-fixed" class="on">Reference (22-yr study)</button>
+  <button id="btn-selfcal">Calibrate to my universe</button>
+  <span style="flex:1"></span>
+  <label>Lookback <input type="number" id="p-lookback" value="20" min="5" max="60"></label>
+  <label>High × <input type="number" id="p-high" value="1.5" step="0.1" min="1"></label>
+  <label>Low × <input type="number" id="p-low" value="0.5" step="0.05" min="0.05" max="1"></label>
+  <button id="btn-recalc" disabled title="Load a raw CSV to change parameters">Recalculate</button>
+</div>
+
+<div class="drop" id="drop">
+  Drop <span class="num">regime_data.json</span> here, or a raw CSV
+  (<span class="num">date,symbol,open,high,low,close,volume</span>) to compute in the browser.
+  <input type="file" id="file" class="hidden" accept=".json,.csv">
+  <div style="margin-top:8px"><button id="btn-browse">Choose file</button></div>
+</div>
+
+<div class="note" id="note"></div>
+
+<script>
+"use strict";
+
+/* ===================================================================
+   Engine — a faithful port of regime_engine.py. Cross-checked against
+   the Python implementation on identical input.
+   =================================================================== */
+
+const BANDS_FIXED = [
+  [0.00,0.25,"DEAD","Stand aside"],
+  [0.25,0.50,"CHOPPY","Selective / favour shorts"],
+  [0.50,0.70,"TRADABLE","Breakouts work — trade"],
+  [0.70,1.00,"STRONG","Press"],
+  [1.00,2.00,"HIGH DEMAND","Press, but watch maturity"],
+  [2.00,1e9,"EXTREME","Shakeout — caution"]
+];
+const REFERENCE_FREQ = {"DEAD":.12,"CHOPPY":.40,"TRADABLE":.23,"STRONG":.12,"HIGH DEMAND":.10,"EXTREME":.03};
+// Cumulative shares of the reference distribution — the percentile boundaries
+// the original band edges correspond to.
+const REF_CUTS = [.12,.52,.75,.87,.97];
+const MATURITY_WARN = 15, MATURITY_HIGH = 25;
+
+const P = {lookback:20, baseline:"median", exclude_today:true, high_mult:1.5,
+           low_mult:0.5, slope_days:3, slope_dead:.05, slope_trigger:.08,
+           min_low_count:1, ratio_cap:5.0};
+
+function median(a){const s=[...a].sort((x,y)=>x-y),m=s.length>>1;
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function baselineOf(a,method){if(!a.length)return null;
+  return method==="mean"?a.reduce((x,y)=>x+y,0)/a.length:median(a);}
+function bandFor(r,bands){
+  if(r==null)return["NO DATA","Insufficient history"];
+  for(const b of bands) if(r>=b[0]&&r<b[1]) return [b[2],b[3]];
+  return["EXTREME","Shakeout — caution"];
+}
+function closePos(b){const rng=b.high-b.low; return rng>0?(b.close-b.low)/rng:null;}
+function pctChange(bars,i){if(i===0)return null;const p=bars[i-1].close;
+  return p?((bars[i].close-p)/p)*100:null;}
+
+function computeDaily(barsBySymbol, params){
+  const p = Object.assign({},P,params||{});
+  const need = p.lookback + (p.exclude_today?1:0);
+  const dateSet = new Set();
+  for(const s in barsBySymbol) for(const b of barsBySymbol[s]) dateSet.add(b.date);
+  const dates=[...dateSet].sort();
+  const idx={};
+  for(const s in barsBySymbol){idx[s]={}; barsBySymbol[s].forEach((b,i)=>idx[s][b.date]=i);}
+
+  const out=[];
+  for(const date of dates){
+    let nH=0,nL=0,up=0,dn=0,upper=0,lower=0,counted=0;
+    const hiN=[],loN=[];
+    for(const sym in barsBySymbol){
+      const bars=barsBySymbol[sym], i=idx[sym][date];
+      if(i===undefined||i<need) continue;
+      const bar=bars[i], vol=bar.volume;
+      if(!vol||vol<=0) continue;
+      const end = p.exclude_today ? i : i+1;
+      const win=[];
+      for(let j=end-p.lookback;j<end;j++) if(bars[j].volume>0) win.push(bars[j].volume);
+      if(win.length < Math.max(5, p.lookback>>1)) continue;
+      const base=baselineOf(win,p.baseline);
+      if(!base||base<=0) continue;
+      const rvol=vol/base; counted++;
+      const chg=pctChange(bars,i), cpr=closePos(bar);
+      if(rvol>=p.high_mult){nH++; hiN.push({symbol:sym,rvol:+rvol.toFixed(2),chg,cpr});}
+      else if(rvol<p.low_mult){nL++; loN.push({symbol:sym,rvol:+rvol.toFixed(2),chg,cpr});}
+      if(chg!=null){ if(chg>0)up++; else if(chg<0)dn++; }
+      if(cpr!=null){ if(cpr>0.5)upper++; else lower++; }
+    }
+    if(!counted) continue;
+    let ratio = nH / Math.max(nL, p.min_low_count);
+    const capped = ratio > p.ratio_cap;
+    ratio = Math.min(ratio, p.ratio_cap);
+    hiN.sort((a,b)=>b.rvol-a.rvol); loN.sort((a,b)=>a.rvol-b.rvol);
+    const [name,action]=bandFor(ratio,BANDS_FIXED);
+    out.push({date,ratio:+ratio.toFixed(3),ratio_capped:capped,regime:name,action,
+      n_high:nH,n_low:nL,n_counted:counted,adv:up,dec:dn,
+      upper_half:upper,lower_half:lower,
+      high_names:hiN.slice(0,25),low_names:loN.slice(0,25)});
+  }
+  addSlopeAndPersistence(out,P);
+  out.forEach(s=>Object.assign(s,verdictOf(s)));
+  return out;
+}
+
+function addSlopeAndPersistence(ss,p){
+  const n=p.slope_days;
+  ss.forEach((s,i)=>{
+    if(i>=n){
+      const sl=s.ratio-ss[i-n].ratio; s.slope=+sl.toFixed(3);
+      s.slope_label = sl>p.slope_trigger?"RISING" : sl<-p.slope_trigger?"FALLING"
+                    : Math.abs(sl)<=p.slope_dead?"FLAT" : (sl>0?"DRIFT UP":"DRIFT DOWN");
+    } else { s.slope=null; s.slope_label="—"; }
+    s.days_in_regime = (i===0||ss[i-1].regime!==s.regime) ? 1 : ss[i-1].days_in_regime+1;
+  });
+}
+
+function verdictOf(s){
+  const r=s.ratio, heavy=r>=1.0;
+  const weak=s.lower_half>s.upper_half, strong=s.upper_half>=s.lower_half;
+  if(r>=2.0 && weak) return {signal:"SHAKEOUT — climax selling volume",
+    verdict:"SHAKEOUT — do not chase longs", tone:"danger"};
+  if(heavy && weak && s.n_high>=3) return {signal:"SHAKEOUT — heavy selling volume",
+    verdict:"SHAKEOUT — selling vol, DON'T chase longs", tone:"danger"};
+  if(heavy && strong){
+    if(s.days_in_regime>=MATURITY_HIGH) return {signal:"DEMAND — but very extended",
+      verdict:`MATURE — ${s.days_in_regime}d elevated, tighten stops`, tone:"warn"};
+    if(s.days_in_regime>=MATURITY_WARN) return {signal:"DEMAND — maturing",
+      verdict:`PRESS but watch — ${s.days_in_regime}d in regime`, tone:"warn"};
+    return {signal:"GENUINE DEMAND — buyers paying up",
+      verdict:"PRESS — breakouts should hold", tone:"good"};
+  }
+  if(r<0.5 && s.slope_label==="RISING" && s.adv>s.dec)
+    return {signal:"FIRST LIFT — participation returning",
+            verdict:"SCALE IN — start with best setups only", tone:"good"};
+  if(r<0.25) return {signal:"NO PARTICIPATION — tape is dry",
+    verdict:"STAND ASIDE — breakouts will fail", tone:"danger"};
+  if(r<0.5) return {signal:"CHOPPY — thin participation",
+    verdict:"SELECTIVE — size down, favour shorts", tone:"warn"};
+  if(r<0.7) return {signal:"TRADABLE — demand building",
+    verdict:"TRADE — breakouts starting to work", tone:"neutral"};
+  return {signal:"STRONG — healthy participation",
+    verdict:"PRESS — conditions are good", tone:"good"};
+}
+
+/* Self-calibrating bands: same percentile boundaries as the reference study,
+   but cut against this universe's own history. */
+function quantile(sorted,q){
+  if(!sorted.length)return null;
+  const pos=(sorted.length-1)*q, lo=Math.floor(pos), hi=Math.ceil(pos);
+  return sorted[lo]+(sorted[hi]-sorted[lo])*(pos-lo);
+}
+let CALIB_COLLAPSED = 0;
+function calibratedBands(sessions){
+  const v=sessions.map(s=>s.ratio).sort((a,b)=>a-b);
+  let cuts=REF_CUTS.map(q=>quantile(v,q));
+  // Enforce strictly increasing edges. When many sessions share a value --
+  // typically because they are pinned at the ratio cap -- the raw quantiles
+  // collapse onto each other and yield zero-width bands.
+  CALIB_COLLAPSED = 0;
+  const EPS = 0.01;
+  for(let i=1;i<cuts.length;i++){
+    if(cuts[i] <= cuts[i-1]){ cuts[i] = cuts[i-1] + EPS; CALIB_COLLAPSED++; }
+  }
+  cuts = cuts.map(c=>+c.toFixed(3));
+  const names=BANDS_FIXED.map(b=>[b[2],b[3]]);
+  const edges=[0,...cuts,1e9], out=[];
+  for(let i=0;i<names.length;i++) out.push([edges[i],edges[i+1],names[i][0],names[i][1]]);
+  return out;
+}
+function distributionOf(sessions,bands){
+  const t=sessions.length;
+  return bands.map(b=>{
+    const n=sessions.filter(s=>s.ratio>=b[0]&&s.ratio<b[1]).length;
+    return {band:b[2],action:b[3],lo:b[0],hi:b[1]>1e8?null:b[1],
+            days:n,share:t?n/t:0,reference_share:REFERENCE_FREQ[b[2]]||0};
+  });
+}
+function percentileOf(sessions,r){
+  if(!sessions.length)return null;
+  return sessions.filter(s=>s.ratio<r).length/sessions.length;
+}
+
+/* ===================================================================
+   State + rendering
+   =================================================================== */
+let STATE = {payload:null, rawBars:null, tapeLen:90, useCalibrated:false};
+
+function activeBands(){
+  return STATE.useCalibrated && STATE.payload
+    ? calibratedBands(STATE.payload.sessions) : BANDS_FIXED;
+}
+
+function render(){
+  const pl=STATE.payload; if(!pl) return;
+  const bands=activeBands();
+  const sessions=pl.sessions;
+  // Re-band every session under the active scheme.
+  sessions.forEach(s=>{const [n,a]=bandFor(s.ratio,bands); s._band=n; s._action=a;});
+  const cur=sessions[sessions.length-1];
+
+  document.getElementById("m-date").textContent=cur.date;
+  document.getElementById("m-universe").textContent=
+    `${pl.meta.symbols_used} stocks · ${pl.meta.universe}`;
+  document.getElementById("m-gen").textContent=
+    pl.meta.generated_at==="demo"?"demo data":`built ${pl.meta.generated_at}`;
+  document.getElementById("demobar").classList.toggle("hidden",!pl.meta.is_demo);
+
+  // A hosted copy updates itself unattended. If the job quietly stops, the
+  // page would still look fine while showing week-old numbers -- so say so.
+  const stale=document.getElementById("stalebar");
+  stale.classList.add("hidden");
+  if(!pl.meta.is_demo && cur.date){
+    const ageDays=Math.floor((Date.now()-new Date(cur.date+"T12:00:00Z").getTime())/864e5);
+    if(ageDays>=4){
+      stale.textContent=`This reading is from ${cur.date}, ${ageDays} days ago. `+
+        `The daily update has not run since then — check the Actions tab.`;
+      stale.classList.remove("hidden");
+    }
+  }
+
+  document.getElementById("ratio").textContent=cur.ratio.toFixed(2)+(cur.ratio_capped?"+":"");
+  document.getElementById("regime").textContent=cur._band;
+  document.getElementById("action").textContent=cur._action;
+
+  const pct=percentileOf(sessions,cur.ratio);
+  document.getElementById("pct").textContent=
+    `Higher than ${(pct*100).toFixed(0)}% of the last ${sessions.length} sessions`;
+
+  const vb=document.getElementById("verdictbox");
+  vb.className="verdict t-"+cur.tone;
+  document.getElementById("signal").textContent=cur.signal;
+  document.getElementById("verdict").textContent=cur.verdict;
+
+  renderLadder(sessions,bands,cur);
+  renderTape(sessions,bands);
+  renderReadout(cur,pl);
+  renderNames(cur);
+  document.getElementById("hm").textContent=pl.meta.params.high_mult;
+  document.getElementById("lm").textContent=pl.meta.params.low_mult;
+  renderNote(pl,bands);
+}
+
+function renderLadder(sessions,bands,cur){
+  const dist=distributionOf(sessions,bands);
+  const max=Math.max(...dist.map(d=>Math.max(d.share,d.reference_share)),.01);
+  const el=document.getElementById("ladder"); el.innerHTML="";
+  dist.forEach(d=>{
+    const here=d.band===cur._band;
+    const hiTxt=d.hi==null?"∞":d.hi.toFixed(2);
+    const row=document.createElement("div");
+    row.className="rung"+(here?" here":"");
+    row.innerHTML=`
+      <div class="rung-label">${d.band}</div>
+      <div class="rung-bar">
+        <div class="rung-fill" style="width:${(d.share/max*100).toFixed(1)}%"></div>
+        <div class="rung-ref" style="left:${(d.reference_share/max*100).toFixed(1)}%"></div>
+      </div>
+      <div class="rung-val">${d.lo.toFixed(2)}–${hiTxt}</div>`;
+    row.title=`${d.band}: ${d.days} of ${sessions.length} sessions `+
+      `(${(d.share*100).toFixed(1)}%) · 22-yr reference ${(d.reference_share*100).toFixed(0)}%`;
+    el.appendChild(row);
+  });
+}
+
+function renderTape(sessions,bands){
+  const svg=document.getElementById("tape");
+  const view=sessions.slice(-STATE.tapeLen);
+  const W=Math.max(760,Math.min(1180,view.length*13)), H=260;
+  const L=34,R=10,T=12,B=22;
+  const iw=W-L-R, ih=H-T-B;
+  const maxR=Math.max(2.2,...view.map(s=>s.ratio))*1.06;
+  const x=i=>L+(i/Math.max(1,view.length))*iw;
+  const y=v=>T+ih-(Math.min(v,maxR)/maxR)*ih;
+  const step=iw/Math.max(1,view.length);
+
+  let s=`<rect x="0" y="0" width="${W}" height="${H}" fill="#0d1119"/>`;
+
+  // Band zones behind the tape — the environment the reading sits in.
+  const zoneFill=["#241519","#251f14","#16261f","#132a22","#13242e","#261625"];
+  bands.forEach((b,i)=>{
+    const y0=y(Math.min(b[1],maxR)), y1=y(b[0]);
+    if(y1-y0<=0.5) return;
+    s+=`<rect x="${L}" y="${y0}" width="${iw}" height="${y1-y0}" fill="${zoneFill[i]}"/>`;
+    s+=`<line class="gridline" x1="${L}" y1="${y0}" x2="${L+iw}" y2="${y0}"/>`;
+    if(y1-y0>13) s+=`<text class="zonelabel" x="${L+5}" y="${y0+11}">${b[2]}</text>`;
+  });
+
+  // Axis labels.
+  [0,.25,.5,.7,1,1.5,2,3].filter(v=>v<=maxR).forEach(v=>{
+    s+=`<text class="axistext" x="4" y="${y(v)+3}">${v.toFixed(2)}</text>`;
+  });
+
+  // The stair-step path: hold each reading flat across its session, then jump.
+  let d="";
+  view.forEach((sess,i)=>{
+    const x0=x(i), x1=x(i)+step, yy=y(sess.ratio);
+    d += (i===0?`M ${x0} ${yy}`:` L ${x0} ${yy}`) + ` L ${x1} ${yy}`;
+  });
+  s+=`<path class="steppath" d="${d}"/>`;
+
+  // Highlight the last 3 sessions — the slope window.
+  if(view.length>=4){
+    let d2="";
+    view.slice(-4).forEach((sess,i)=>{
+      const j=view.length-4+i, x0=x(j), x1=x(j)+step, yy=y(sess.ratio);
+      d2 += (i===0?`M ${x0} ${yy}`:` L ${x0} ${yy}`) + ` L ${x1} ${yy}`;
+    });
+    s+=`<path class="slopeseg" d="${d2}"/>`;
+  }
+
+  // Today's marker.
+  const last=view[view.length-1];
+  s+=`<circle cx="${x(view.length-1)+step/2}" cy="${y(last.ratio)}" r="3.5"
+       fill="var(--mark)" stroke="#0d1119" stroke-width="1.5"/>`;
+
+  // Sparse date ticks.
+  const every=Math.ceil(view.length/9);
+  view.forEach((sess,i)=>{ if(i%every===0)
+    s+=`<text class="axistext" x="${x(i)}" y="${H-7}">${sess.date.slice(5)}</text>`; });
+
+  svg.setAttribute("width",W); svg.setAttribute("height",H); svg.innerHTML=s;
+  document.getElementById("tapesub").textContent=
+    `${view.length} sessions · amber = the 3-day slope window`;
+}
+
+function renderReadout(cur,pl){
+  const sl=cur.slope_label;
+  const slCls = sl==="RISING"?"up" : sl==="FALLING"?"dn"
+              : sl.startsWith("DRIFT")?"am":"neu";
+  const slNote = sl==="RISING"?" (demand returning)" : sl==="FALLING"?" (demand leaving)":"";
+  const breadthCls=cur.adv>cur.dec?"up":"dn";
+  const closeCls=cur.upper_half>cur.lower_half?"up":"dn";
+  const mature = cur.ratio>=1 && cur.days_in_regime>=MATURITY_WARN;
+  const rows=[
+    ["Volume ratio",`<span class="${cur.ratio>=1?'up':'dn'}">${cur.ratio.toFixed(2)}</span>`],
+    ["Regime",`${cur._band}`],
+    ["Slope (3d)",`<span class="${slCls}">${sl}${slNote}</span>`],
+    ["Days in regime",`<span class="${mature?'am':'neu'}">${cur.days_in_regime} ${cur.days_in_regime===1?'day':'days'}${mature?' — maturing':''}</span>`],
+    ["Breadth",`<span class="${breadthCls}">${cur.adv} up / ${cur.dec} dn</span>`],
+    ["Closes in upper half",`<span class="${closeCls}">${cur.upper_half} / ${cur.upper_half+cur.lower_half}</span>`],
+    ["High-vol stocks",`<span class="up">${cur.n_high} / ${cur.n_counted}</span>`],
+    ["Low-vol stocks",`<span class="dn">${cur.n_low} / ${cur.n_counted}</span>`],
+    ["Baseline",`${pl.meta.params.lookback}d ${pl.meta.params.baseline}`],
+  ];
+  document.getElementById("readout").innerHTML =
+    rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+}
+
+function renderNames(cur){
+  const fmt=n=>{
+    if(!n||!n.length) return `<tr><td colspan="4" style="color:var(--faint)">none</td></tr>`;
+    return n.map(r=>{
+      const c=r.chg==null?"":(r.chg>0?"up":"dn");
+      const chg=r.chg==null?"—":(r.chg>0?"+":"")+r.chg.toFixed(1)+"%";
+      const cpr=r.cpr==null?"—":(r.cpr*100).toFixed(0);
+      return `<tr><td>${r.symbol}</td><td>${r.rvol.toFixed(2)}×</td>
+              <td class="${c}">${chg}</td><td class="neu">${cpr}</td></tr>`;
+    }).join("");
+  };
+  document.getElementById("hinames").innerHTML=fmt(cur.high_names);
+  document.getElementById("lonames").innerHTML=fmt(cur.low_names);
+}
+
+function renderNote(pl,bands){
+  const n=pl.meta.symbols_used;
+  let msg=`Baseline is the ${pl.meta.params.lookback}-session `+
+    `${pl.meta.params.baseline} of each stock's own volume, excluding today. `+
+    `Source: ${pl.meta.source}. `;
+  if(n<100) msg+=`<br><span class="am">Only ${n} stocks in the universe. `+
+    `With counts this small the ratio jumps in visible steps — one stock changing `+
+    `category can move you a whole band. Widen the universe, or use calibrated bands.</span>`;
+  if(STATE.useCalibrated){
+    msg+=`<br>Bands are cut at this universe's own `+
+      `12th / 52nd / 75th / 87th / 97th percentiles — the same boundaries the `+
+      `reference table uses, measured on your data instead of assumed.`;
+    if(CALIB_COLLAPSED) msg+=`<br><span class="am">${CALIB_COLLAPSED} upper band `+
+      `edge(s) had to be forced apart: too many sessions share the same ratio, `+
+      `usually because they are pinned at the ${pl.meta.params.ratio_cap||5} cap. `+
+      `Treat the top bands as unreliable and lengthen your history.</span>`;
+  }
+  document.getElementById("note").innerHTML=msg;
+}
+
+/* ===================================================================
+   Loading
+   =================================================================== */
+function parseCSV(text){
+  const lines=text.trim().split(/\r?\n/);
+  const head=lines[0].split(",").map(h=>h.trim().toLowerCase());
+  const need=["date","symbol","open","high","low","close","volume"];
+  const at={}; need.forEach(k=>at[k]=head.indexOf(k));
+  const missing=need.filter(k=>at[k]<0);
+  if(missing.length) throw new Error("CSV is missing column(s): "+missing.join(", "));
+  const bySym={};
+  for(let i=1;i<lines.length;i++){
+    const p=lines[i].split(",");
+    if(p.length<head.length) continue;
+    const sym=p[at.symbol].trim();
+    (bySym[sym]=bySym[sym]||[]).push({
+      date:p[at.date].trim(), open:+p[at.open], high:+p[at.high],
+      low:+p[at.low], close:+p[at.close], volume:+p[at.volume]});
+  }
+  for(const s in bySym) bySym[s].sort((a,b)=>a.date<b.date?-1:1);
+  return bySym;
+}
+
+function buildFromBars(bars,params){
+  const sessions=computeDaily(bars,params);
+  if(!sessions.length) throw new Error("Not enough overlapping history to compute a reading.");
+  const p=Object.assign({},P,params||{});
+  return {
+    meta:{generated_at:new Date().toISOString().slice(0,19),
+          universe:"loaded from CSV", symbols_used:Object.keys(bars).length,
+          sessions_total:sessions.length, params:p,
+          source:"CSV supplied by you"},
+    bands:BANDS_FIXED.map(b=>({lo:b[0],hi:b[1]>1e8?null:b[1],name:b[2],action:b[3]})),
+    distribution:distributionOf(sessions,BANDS_FIXED),
+    sessions, current:sessions[sessions.length-1],
+    percentile:percentileOf(sessions,sessions[sessions.length-1].ratio)
+  };
+}
+
+function loadText(name,text){
+  try{
+    if(name.toLowerCase().endsWith(".csv")){
+      STATE.rawBars=parseCSV(text);
+      STATE.payload=buildFromBars(STATE.rawBars,readParams());
+      document.getElementById("btn-recalc").disabled=false;
+    } else {
+      STATE.payload=JSON.parse(text);
+      STATE.rawBars=null;
+      document.getElementById("btn-recalc").disabled=true;
+    }
+    render();
+  }catch(e){
+    document.getElementById("note").innerHTML=
+      `<span style="color:var(--risk)">Could not read ${name}: ${e.message}</span>`;
+  }
+}
+
+function readParams(){
+  return {lookback:+document.getElementById("p-lookback").value,
+          high_mult:+document.getElementById("p-high").value,
+          low_mult:+document.getElementById("p-low").value};
+}
+
+async function boot(){
+  for(const f of ["regime_data.json","demo_data.json"]){
+    try{
+      const r=await fetch(f,{cache:"no-store"});
+      if(!r.ok) continue;
+      STATE.payload=await r.json();
+      render(); return;
+    }catch(e){/* file:// or missing — fall through */}
+  }
+  document.getElementById("note").innerHTML=
+    `No data file found. Run <span class="num">python fetch_regime.py</span>, `+
+    `then serve this folder with <span class="num">python -m http.server 8000</span>. `+
+    `Opening this file directly from disk blocks the browser from reading the data — `+
+    `drop the file below instead.`;
+}
+
+/* wiring */
+const drop=document.getElementById("drop"), fileInput=document.getElementById("file");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault(); drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault(); drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{
+  const f=e.dataTransfer.files[0]; if(!f) return;
+  const rd=new FileReader(); rd.onload=()=>loadText(f.name,rd.result); rd.readAsText(f);
+});
+document.getElementById("btn-browse").addEventListener("click",()=>fileInput.click());
+fileInput.addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader(); rd.onload=()=>loadText(f.name,rd.result); rd.readAsText(f);
+});
+document.getElementById("btn-recalc").addEventListener("click",()=>{
+  if(!STATE.rawBars) return;
+  STATE.payload=buildFromBars(STATE.rawBars,readParams()); render();
+});
+function tapeBtn(id,len){document.getElementById(id).addEventListener("click",()=>{
+  STATE.tapeLen=len;
+  ["btn-90","btn-180","btn-all"].forEach(b=>document.getElementById(b).classList.remove("on"));
+  document.getElementById(id).classList.add("on");
+  if(STATE.payload) renderTape(STATE.payload.sessions,activeBands());
+});}
+tapeBtn("btn-90",90); tapeBtn("btn-180",180); tapeBtn("btn-all",99999);
+document.getElementById("btn-fixed").addEventListener("click",()=>{
+  STATE.useCalibrated=false;
+  document.getElementById("btn-fixed").classList.add("on");
+  document.getElementById("btn-selfcal").classList.remove("on"); render();});
+document.getElementById("btn-selfcal").addEventListener("click",()=>{
+  STATE.useCalibrated=true;
+  document.getElementById("btn-selfcal").classList.add("on");
+  document.getElementById("btn-fixed").classList.remove("on"); render();});
+
+boot();
+</script>
+</body>
+</html>
