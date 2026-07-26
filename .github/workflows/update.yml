@@ -1,0 +1,72 @@
+name: Update volume regime
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: regime-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch market data
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::Attempt $attempt"
+            if python fetch_regime.py --universe nifty500 --years 3; then
+              echo "::endgroup::"
+              echo "Fetch succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "Attempt $attempt failed."
+            [ "$attempt" -lt 3 ] && sleep 90
+          done
+          echo "All three attempts failed. Keeping the previous data file."
+          exit 1
+
+      - name: Check the file looks sane
+        run: |
+          python - <<'PY'
+          import json, sys
+          d = json.load(open("regime_data.json"))
+          n = d["meta"]["symbols_used"]
+          s = len(d["sessions"])
+          print(f"{n} stocks, {s} sessions, latest {d['current']['date']}, "
+                f"ratio {d['current']['ratio']} ({d['current']['regime']})")
+          if n < 50:  sys.exit(f"Only {n} stocks came back -- refusing to publish.")
+          if s < 30:  sys.exit(f"Only {s} sessions -- refusing to publish.")
+          PY
+
+      - name: Publish the updated data
+        run: |
+          git config user.name  "regime-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add regime_data.json
+          if git diff --staged --quiet; then
+            echo "No change since the last run."
+          else
+            git commit -m "Regime data $(date -u '+%Y-%m-%d')"
+            git push
+          fi
