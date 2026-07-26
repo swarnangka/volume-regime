@@ -1,12 +1,7 @@
 name: Update volume regime
 
-# Runs itself on a schedule. You can also start it by hand from the
-# Actions tab -- no terminal needed.
 on:
   schedule:
-    # 12:00 UTC = 17:30 IST, weekdays. NSE closes 15:30 IST, so this leaves
-    # roughly two hours for the day's volume to settle at the data source.
-    # GitHub often runs scheduled jobs late; treat the time as approximate.
     - cron: "0 12 * * 1-5"
   workflow_dispatch:
 
@@ -36,12 +31,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Fetch market data
-        # The data source rate-limits sometimes. Three attempts, then give up
-        # loudly rather than committing a half-built file.
         run: |
           for attempt in 1 2 3; do
             echo "::group::Attempt $attempt"
-            if python fetch_regime.py --universe nifty500 --years 3; then
+            if python fetch_regime.py --universe nifty500 --years 3 --baseline mean; then
               echo "::endgroup::"
               echo "Fetch succeeded on attempt $attempt"
               exit 0
