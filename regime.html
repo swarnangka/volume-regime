@@ -125,6 +125,8 @@ button{
 }
 button:hover{background:#26303f}
 button.on{background:var(--mark); border-color:var(--mark); color:#0d1119}
+button:disabled{opacity:.5; cursor:default}
+#btn-refresh{padding:3px 10px; font-size:11px}
 :focus-visible{outline:2px solid var(--mark); outline-offset:2px}
 
 .drop{
@@ -165,6 +167,8 @@ button.on{background:var(--mark); border-color:var(--mark); color:#0d1119}
     <span id="m-date">—</span>
     <span id="m-universe">—</span>
     <span id="m-gen">—</span>
+    <span id="m-checked">—</span>
+    <button id="btn-refresh" title="Re-fetch regime_data.json from the server, bypassing cache">Refresh</button>
   </div>
 </div>
 
@@ -705,15 +709,42 @@ function readParams(){
           low_mult:+document.getElementById("p-low").value};
 }
 
-async function boot(){
-  for(const f of ["regime_data.json","demo_data.json"]){
-    try{
-      const r=await fetch(f,{cache:"no-store"});
-      if(!r.ok) continue;
-      STATE.payload=await r.json();
-      render(); return;
-    }catch(e){/* file:// or missing — fall through */}
+function stampChecked(msg){
+  const now=new Date();
+  const hhmm=now.toTimeString().slice(0,8);
+  document.getElementById("m-checked").textContent=`checked ${hhmm}${msg?" — "+msg:""}`;
+}
+
+async function checkForUpdate(isManual){
+  const btn=document.getElementById("btn-refresh");
+  if(isManual){btn.disabled=true; btn.textContent="Checking…";}
+  try{
+    const r=await fetch("regime_data.json",{cache:"no-store"});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const fresh=await r.json();
+    const prevGen=STATE.payload && STATE.payload.meta && STATE.payload.meta.generated_at;
+    const newGen=fresh.meta && fresh.meta.generated_at;
+    const changed = prevGen !== newGen;
+    STATE.payload=fresh;
+    render();
+    stampChecked(isManual ? (changed?"new data loaded":"already current") : null);
+  }catch(e){
+    if(isManual) stampChecked(`refresh failed (${e.message})`);
+    // On boot, a failed fetch is handled by the caller (falls back to demo data).
+    if(!isManual) throw e;
+  }finally{
+    if(isManual){btn.disabled=false; btn.textContent="Refresh";}
   }
+}
+
+document.getElementById("btn-refresh").addEventListener("click",()=>checkForUpdate(true));
+
+async function boot(){
+  try{ await checkForUpdate(false); return; }catch(e){/* fall through to demo */}
+  try{
+    const r=await fetch("demo_data.json",{cache:"no-store"});
+    if(r.ok){ STATE.payload=await r.json(); render(); stampChecked(); return; }
+  }catch(e){/* file:// or missing — fall through */}
   document.getElementById("note").innerHTML=
     `No data file found. Run <span class="num">python fetch_regime.py</span>, `+
     `then serve this folder with <span class="num">python -m http.server 8000</span>. `+
